@@ -25,6 +25,14 @@
   cursor: progress;
 }
 
+.refine-chatgpt-btn.refine-chatgpt-floating {
+  position: absolute;
+  bottom: 14px;
+  right: 110px;
+  z-index: 2147483647;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
 .refine-chatgpt-tip {
   margin-left: 8px;
   font-size: 12px;
