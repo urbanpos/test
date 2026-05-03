@@ -1,21 +1,23 @@
 .refine-chatgpt-btn {
-  margin-left: 12px;
+  display: inline-block;
+  vertical-align: middle;
+  margin: 4px 8px;
   padding: 6px 14px;
-  border: 1px solid #c5c5c5;
+  border: 1px solid #1a73e8;
   border-radius: 18px;
-  background: linear-gradient(180deg, #ffffff 0%, #f1f3f4 100%);
-  color: #202124;
+  background: #1a73e8;
+  color: #ffffff;
   font-family: "Google Sans", Roboto, Arial, sans-serif;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   height: 32px;
-  align-self: center;
+  line-height: 18px;
 }
 
 .refine-chatgpt-btn:hover:not(:disabled) {
-  background: #f1f3f4;
-  border-color: #a8a8a8;
+  background: #1765c1;
+  border-color: #1765c1;
 }
 
 .refine-chatgpt-btn:disabled {

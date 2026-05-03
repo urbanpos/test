@@ -1,6 +1,6 @@
 // Injects a "Refine with ChatGPT" button into every Gmail compose window.
-// Clicking the button sends the current draft body to the background worker,
-// which routes it through a chatgpt.com tab, then replaces the body with the result.
+// Strategy: find the body editor (most stable selector), walk up to the compose
+// root, then find the bottom toolbar (.btC) where Send lives.
 
 const BUTTON_MARKER = "data-refine-chatgpt-injected";
 const DEFAULT_PROMPT =
@@ -8,21 +8,58 @@ const DEFAULT_PROMPT =
   "improve clarity and flow, and keep it concise. Return only the rewritten " +
   "email body with no preamble, commentary, or quotes.\n\n---\n\n";
 
-function findComposeWindows() {
-  // Compose dialogs use role="dialog" with a Send button labeled "Send".
-  return Array.from(document.querySelectorAll('div[role="dialog"]'))
-    .filter((d) => d.querySelector('div[role="button"][data-tooltip^="Send"]'));
+function log(...args) { console.log("[RefineChatGPT]", ...args); }
+
+function findBodyEditors() {
+  // The body editor is the most stable anchor across Gmail UI variants.
+  // It's a contenteditable div with aria-label starting with "Message Body".
+  let editors = Array.from(document.querySelectorAll(
+    'div[role="textbox"][aria-label^="Message Body"], ' +
+    'div[contenteditable="true"][aria-label^="Message Body"], ' +
+    'div[contenteditable="true"][g_editable="true"]'
+  ));
+  if (editors.length === 0) {
+    // Localized fallback: any contenteditable inside a compose form.
+    editors = Array.from(document.querySelectorAll(
+      'form[enctype] div[contenteditable="true"]'
+    ));
+  }
+  return editors;
 }
 
-function findBodyEditor(composeRoot) {
-  return composeRoot.querySelector('div[role="textbox"][aria-label^="Message Body"]')
-      || composeRoot.querySelector('div[role="textbox"][g_editable="true"]');
+function findComposeRoot(editor) {
+  // Walk up to the dialog or form that wraps the whole compose window.
+  return editor.closest('div[role="dialog"]')
+      || editor.closest('form')
+      || editor.parentElement;
 }
 
 function findToolbar(composeRoot) {
-  // The send-row contains the Send button; we add our button right after it.
-  const send = composeRoot.querySelector('div[role="button"][data-tooltip^="Send"]');
-  return send ? send.parentElement : null;
+  // .btC is Gmail's compose footer (Send button + formatting + attach).
+  // Fall back to the row containing a Send button identified by class or aria.
+  let tb = composeRoot.querySelector('.btC');
+  if (tb) return tb;
+
+  const send = findSendButton(composeRoot);
+  if (send) {
+    // Walk up a couple levels to land on the toolbar row.
+    let el = send;
+    for (let i = 0; i < 5 && el; i++) {
+      if (el.children && el.children.length >= 2) return el;
+      el = el.parentElement;
+    }
+    return send.parentElement;
+  }
+  return null;
+}
+
+function findSendButton(composeRoot) {
+  return composeRoot.querySelector(
+    'div[role="button"][data-tooltip^="Send"], ' +
+    'div[role="button"][aria-label^="Send"], ' +
+    'div.T-I.T-I-atl, ' +
+    'div.T-I-KE'
+  );
 }
 
 async function getStoredPrompt() {
@@ -34,7 +71,6 @@ async function getStoredPrompt() {
 }
 
 function setBodyHtml(editor, text) {
-  // Convert plain text (with blank-line paragraphs) into Gmail-style HTML.
   const paragraphs = text.split(/\n{2,}/).map((para) => {
     const lines = para.split(/\n/).map(escapeHtml).join("<br>");
     return `<div>${lines || "<br>"}</div>`;
@@ -50,16 +86,20 @@ function escapeHtml(s) {
 }
 
 function getBodyText(editor) {
-  // innerText preserves visible line breaks the way the user sees them.
   return editor.innerText.replace(/ /g, " ").trimEnd();
 }
 
-function injectButton(composeRoot) {
+function injectButton(editor) {
+  const composeRoot = findComposeRoot(editor);
+  if (!composeRoot) return;
   if (composeRoot.hasAttribute(BUTTON_MARKER)) return;
   const toolbar = findToolbar(composeRoot);
-  const editor = findBodyEditor(composeRoot);
-  if (!toolbar || !editor) return;
+  if (!toolbar) {
+    log("toolbar not found for compose", composeRoot);
+    return;
+  }
   composeRoot.setAttribute(BUTTON_MARKER, "1");
+  log("injecting into toolbar", toolbar);
 
   const btn = document.createElement("button");
   btn.type = "button";
@@ -111,9 +151,12 @@ function flash(btn, msg, isError) {
 }
 
 function scan() {
-  for (const c of findComposeWindows()) injectButton(c);
+  for (const editor of findBodyEditors()) {
+    try { injectButton(editor); } catch (err) { log("inject error", err); }
+  }
 }
 
 const observer = new MutationObserver(() => scan());
 observer.observe(document.body, { childList: true, subtree: true });
 scan();
+log("content script loaded");
