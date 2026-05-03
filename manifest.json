@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Gmail Refine with ChatGPT",
+  "version": "0.1.0",
+  "description": "Adds a 'Refine with ChatGPT' button to the Gmail compose window. Refines your draft using your logged-in chatgpt.com account.",
+  "permissions": ["storage", "tabs", "scripting"],
+  "host_permissions": [
+    "https://mail.google.com/*",
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://mail.google.com/*"],
+      "js": ["content_gmail.js"],
+      "css": ["content_gmail.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*"],
+      "js": ["content_chatgpt.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": false
+  },
+  "action": {
+    "default_title": "Gmail Refine with ChatGPT — open settings",
+    "default_popup": "options.html"
+  }
+}

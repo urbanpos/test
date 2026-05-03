@@ -1,0 +1,35 @@
+.refine-chatgpt-btn {
+  margin-left: 12px;
+  padding: 6px 14px;
+  border: 1px solid #c5c5c5;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f1f3f4 100%);
+  color: #202124;
+  font-family: "Google Sans", Roboto, Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  height: 32px;
+  align-self: center;
+}
+
+.refine-chatgpt-btn:hover:not(:disabled) {
+  background: #f1f3f4;
+  border-color: #a8a8a8;
+}
+
+.refine-chatgpt-btn:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.refine-chatgpt-tip {
+  margin-left: 8px;
+  font-size: 12px;
+  color: #1a73e8;
+  align-self: center;
+}
+
+.refine-chatgpt-tip.err {
+  color: #d93025;
+}
