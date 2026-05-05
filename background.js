@@ -6,8 +6,8 @@
 //   4. We relay that back to the Gmail tab that asked.
 
 const CHATGPT_URL = "https://chatgpt.com/";
-const READY_TIMEOUT_MS = 30000;
-const RESPONSE_TIMEOUT_MS = 120000;
+const READY_TIMEOUT_MS = 20000;
+const RESPONSE_TIMEOUT_MS = 90000;
 
 const pending = new Map(); // requestId -> { gmailTabId, sendResponse, timer }
 
@@ -25,7 +25,9 @@ async function findChatGptTab() {
 async function ensureChatGptTab() {
   const existing = await findChatGptTab();
   if (existing) return existing;
-  return await chrome.tabs.create({ url: CHATGPT_URL, active: false });
+  // Open visibly the first time so the user can see what's happening (login,
+  // Cloudflare challenge, etc.). Subsequent refines reuse the same tab.
+  return await chrome.tabs.create({ url: CHATGPT_URL, active: true });
 }
 
 function waitForChatGptReady(tabId) {
