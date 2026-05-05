@@ -27,7 +27,21 @@ const STOP_SELECTORS = [
   'button[aria-label*="Stop"]',
 ];
 
-const ASSISTANT_MSG_SELECTOR = '[data-message-author-role="assistant"]';
+const ASSISTANT_MSG_SELECTORS = [
+  '[data-message-author-role="assistant"]',
+  'div.agent-turn',
+  'div[data-testid^="conversation-turn-"][data-message-author-role="assistant"]',
+];
+
+function queryAllAssistant() {
+  for (const sel of ASSISTANT_MSG_SELECTORS) {
+    const list = document.querySelectorAll(sel);
+    if (list.length) return list;
+  }
+  return [];
+}
+
+const ASSISTANT_MSG_SELECTOR = ASSISTANT_MSG_SELECTORS[0]; // for back-compat
 
 function pickFirst(selectors) {
   for (const sel of selectors) {
@@ -108,26 +122,63 @@ async function clickSend() {
   });
 }
 
+function getLastAssistantNode() {
+  const msgs = queryAllAssistant();
+  return msgs[msgs.length - 1] || null;
+}
+
+function readNodeTextFallback(node) {
+  // Try a few inner content selectors before falling back to the whole node.
+  const inner = node.querySelector(".markdown") ||
+                node.querySelector('[data-message-id] .prose') ||
+                node.querySelector('.prose') ||
+                node;
+  return (inner.innerText || "").trim();
+}
+
+function readNodeText(node) {
+  if (!node) return "";
+  return readNodeTextFallback(node);
+}
+
 async function waitForAnswerComplete(beforeCount) {
-  // Wait for a new assistant message OR a stop button to appear.
+  // Phase 1: a new assistant message appears (or stop button shows up).
   const started = await waitFor(() => {
     return findStop() ||
-      (document.querySelectorAll(ASSISTANT_MSG_SELECTOR).length > beforeCount);
+      (queryAllAssistant().length > beforeCount);
   }, { timeout: 20000 });
   if (!started) throw new Error("ChatGPT did not start responding (rate limited or page state issue).");
   log("response started");
-  // Wait for stop button to disappear.
-  await waitFor(() => !findStop(), { timeout: 80000, interval: 400 });
-  await sleep(500);
-  log("response complete");
+
+  // Phase 2: completion — either the stop button disappears, or the last
+  // assistant message's text remains unchanged for 2 consecutive seconds.
+  const STABLE_MS = 2000;
+  const POLL_MS = 400;
+  let lastText = "";
+  let stableSince = 0;
+  const start = Date.now();
+
+  while (Date.now() - start < 80000) {
+    const node = getLastAssistantNode();
+    const text = readNodeText(node);
+    const stopVisible = !!findStop();
+
+    if (text !== lastText) {
+      lastText = text;
+      stableSince = Date.now();
+    }
+
+    if (!stopVisible && text && Date.now() - stableSince >= STABLE_MS) {
+      log("response stable, complete");
+      return;
+    }
+    await sleep(POLL_MS);
+  }
+  log("response timed out, returning whatever we have");
 }
 
 function readLastAnswer() {
-  const msgs = document.querySelectorAll(ASSISTANT_MSG_SELECTOR);
-  const last = msgs[msgs.length - 1];
-  if (!last) return "";
-  const md = last.querySelector(".markdown") || last;
-  return md.innerText.trim();
+  return readNodeText(getLastAssistantNode());
 }
 
 async function runRefine(requestId, prompt, text) {
@@ -136,7 +187,7 @@ async function runRefine(requestId, prompt, text) {
     if (!isReady()) {
       throw new Error("ChatGPT page not ready. Log in, dismiss any popups/Cloudflare challenge, then retry.");
     }
-    const before = document.querySelectorAll(ASSISTANT_MSG_SELECTOR).length;
+    const before = queryAllAssistant().length;
 
     await typeIntoComposer(prompt + text);
     await clickSend();

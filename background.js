@@ -25,9 +25,9 @@ async function findChatGptTab() {
 async function ensureChatGptTab() {
   const existing = await findChatGptTab();
   if (existing) return existing;
-  // Open visibly the first time so the user can see what's happening (login,
-  // Cloudflare challenge, etc.). Subsequent refines reuse the same tab.
-  return await chrome.tabs.create({ url: CHATGPT_URL, active: true });
+  // Open hidden in the background — the user does not need to see it once
+  // they're already logged in.
+  return await chrome.tabs.create({ url: CHATGPT_URL, active: false });
 }
 
 function waitForChatGptReady(tabId) {
